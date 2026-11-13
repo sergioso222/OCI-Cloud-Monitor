@@ -1,14 +1,13 @@
 import os
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import oci
 
-# Cargar variables de entorno desde .env
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configuración de OCI usando variables de entorno (cero datos sensibles hardcodeados)
+# Configuración segura de OCI desde .env
 oci_config = {
     "user": os.getenv("OCI_USER_OCID"),
     "key_file": os.getenv("OCI_KEY_FILE"),
@@ -25,7 +24,6 @@ def get_oci_instances():
     compute_client = oci.core.ComputeClient(oci_config)
     network_client = oci.core.VirtualNetworkClient(oci_config)
 
-    # 1. Listar instancias del compartimento
     instances_response = compute_client.list_instances(compartment_id=COMPARTMENT_ID)
     instances_data = []
 
@@ -33,7 +31,6 @@ def get_oci_instances():
         public_ip = "N/A"
         private_ip = "N/A"
 
-        # 2. Obtener interfaces de red (VNIC) adjuntas para extraer las IPs
         vnic_attachments = compute_client.list_vnic_attachments(
             compartment_id=COMPARTMENT_ID,
             instance_id=inst.id
@@ -51,13 +48,48 @@ def get_oci_instances():
             "state": inst.lifecycle_state,
             "shape": inst.shape,
             "region": inst.region,
-            "availability_domain": inst.availability_domain,
             "private_ip": private_ip,
             "public_ip": public_ip,
             "time_created": inst.time_created.strftime("%Y-%m-%d %H:%M")
         })
 
     return instances_data
+
+
+def analyze_sentiment_oci(text):
+    """Consume OCI AI Language para analizar el sentimiento de un texto."""
+    ai_client = oci.ai_language.AIServiceLanguageClient(oci_config)
+
+    document = oci.ai_language.models.TextDocument(
+        key="doc_1",
+        text=text
+    )
+
+    details = oci.ai_language.models.BatchDetectLanguageSentimentsDetails(
+        documents=[document]
+    )
+
+    response = ai_client.batch_detect_language_sentiments(
+        batch_detect_language_sentiments_details=details,
+        level=["ASPECT", "SENTENCE"]
+    )
+
+    result_doc = response.data.documents[0]
+
+    aspects = [
+        {
+            "text": asp.text,
+            "sentiment": asp.sentiment,
+            "scores": asp.scores
+        }
+        for asp in (result_doc.aspects or [])
+    ]
+
+    return {
+        "sentiment": result_doc.document_sentiment,
+        "scores": result_doc.document_scores,
+        "aspects": aspects
+    }
 
 
 @app.route("/")
@@ -70,6 +102,21 @@ def api_instances():
     try:
         data = get_oci_instances()
         return jsonify({"status": "ok", "instances": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/sentiment", methods=["POST"])
+def api_sentiment():
+    data = request.get_json() or {}
+    text = data.get("text", "").strip()
+
+    if not text:
+        return jsonify({"status": "error", "message": "Por favor escribe un texto para analizar."}), 400
+
+    try:
+        analysis = analyze_sentiment_oci(text)
+        return jsonify({"status": "ok", "result": analysis})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
