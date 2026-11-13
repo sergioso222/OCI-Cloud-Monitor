@@ -23,20 +23,20 @@ Aplicación web ligera desarrollada con **Python (Flask)** y el **SDK oficial de
    cd OCI-Cloud-Monitor
 
 2. **Crear y activar el entorno virtual:**
-python -m venv venv
-### En Windows (PowerShell):
-.\venv\Scripts\activate
-### En Linux / macOS:
-source venv/bin/activate
+    - python -m venv venv
+    ### En Windows (PowerShell):
+    - .\venv\Scripts\activate
+    ### En Linux / macOS:
+    - source venv/bin/activate
 
 3. **Instalar las dependencias:**
-pip install -r requirements.txt
+    - pip install -r requirements.txt
 
 4. **Configurar las variables de entorno:**
-### En Windows (PowerShell):
-Copy-Item .env.example .env
-### En Linux / macOS:
-cp .env.example .env
+    ### En Windows (PowerShell):
+    - Copy-Item .env.example .env
+    ### En Linux / macOS:
+    - cp .env.example .env
 
 5. **Ejecutar la aplicacion:**
-python app.py
+    - python app.py
