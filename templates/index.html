@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCI Cloud Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+    <div class="max-w-5xl mx-auto px-4 py-10">
+        <!-- Encabezado -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-6 mb-8">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-orange-400">Oracle Cloud Infrastructure</span>
+                <h1 class="text-3xl font-bold mt-1">Monitor de Instancias</h1>
+                <p class="text-slate-400 text-sm mt-1">Estado en tiempo real consumiendo OCI REST API vía Python SDK</p>
+            </div>
+            <button id="refreshBtn" onclick="loadInstances()" class="bg-orange-600 hover:bg-orange-500 text-white font-medium px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer">
+                <span>↻ Actualizar</span>
+            </button>
+        </header>
+
+        <!-- Mensaje de carga / error -->
+        <div id="statusBox" class="hidden mb-6 p-4 rounded-lg border"></div>
+
+        <!-- Contenedor de tarjetas -->
+        <div id="instancesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </div>
+
+    <script>
+        function getBadgeStyle(state) {
+            const styles = {
+                'RUNNING': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+                'STOPPED': 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+                'STARTING': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                'STOPPING': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                'TERMINATED': 'bg-slate-700/40 text-slate-400 border-slate-600'
+            };
+            return styles[state] || 'bg-sky-500/15 text-sky-400 border-sky-500/30';
+        }
+
+        async function loadInstances() {
+            const grid = document.getElementById('instancesGrid');
+            const statusBox = document.getElementById('statusBox');
+            const btn = document.getElementById('refreshBtn');
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            statusBox.className = 'mb-6 p-4 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-300 text-sm';
+            statusBox.textContent = 'Consultando API de Oracle Cloud...';
+            statusBox.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/api/instances');
+                const data = await res.json();
+
+                if (data.status !== 'ok') {
+                    throw new Error(data.message || 'Error al consultar OCI');
+                }
+
+                statusBox.classList.add('hidden');
+                grid.innerHTML = '';
+
+                if (data.instances.length === 0) {
+                    statusBox.className = 'mb-6 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm';
+                    statusBox.textContent = 'Conexión exitosa (200 OK), pero no se encontraron instancias en este compartimento.';
+                    statusBox.classList.remove('hidden');
+                    return;
+                }
+
+                data.instances.forEach(inst => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-800/80 border border-slate-700/80 rounded-xl p-6 shadow-lg';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start gap-3 mb-4">
+                            <div>
+                                <h2 class="text-lg font-semibold text-white">${inst.name}</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">${inst.shape}</p>
+                            </div>
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full border ${getBadgeStyle(inst.state)}">
+                                ${inst.state}
+                            </span>
+                        </div>
+                        <div class="space-y-2 text-sm border-t border-slate-700/60 pt-4">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">IP Pública:</span>
+                                <span class="font-mono text-slate-200">${inst.public_ip}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">IP Privada:</span>
+                                <span class="font-mono text-slate-200">${inst.private_ip}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Región:</span>
+                                <span class="text-slate-200">${inst.region}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Creada:</span>
+                                <span class="text-slate-300">${inst.time_created}</span>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                statusBox.className = 'mb-6 p-4 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 text-sm';
+                statusBox.textContent = 'Error de conexión con OCI: ' + err.message;
+                statusBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+
+        // Cargar automáticamente al abrir la página
+        loadInstances();
+    </script>
+</body>
+</html>
