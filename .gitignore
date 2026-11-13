@@ -1,0 +1,8 @@
+# Entorno virtual de Python
+venv/
+__pycache__/
+
+# Credenciales y llaves privadas de Oracle (CRÍTICO)
+.env
+*.pem
+config
